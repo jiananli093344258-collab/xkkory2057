@@ -6,10 +6,14 @@
 <title>💕 下單平台</title>
 
 <style>
-body { font-family:sans-serif; background:#fff0f5; padding:15px; }
-.card { background:#fff; padding:10px; border-radius:10px; margin:10px 0; }
-button { background:#ff8fab; color:#fff; border:none; padding:8px; border-radius:6px; }
-.footer { position:fixed; bottom:0; left:0; right:0; background:#fff; padding:10px; display:flex; justify-content:space-between; }
+body { font-family:sans-serif; background:#fff0f5; padding:10px; margin:0;}
+.tab { display:flex; }
+.tab button { flex:1; padding:10px; border:none; background:#ffd6e0; }
+.tab button.active { background:#ff8fab; color:white; }
+.card { background:#fff; padding:10px; border-radius:10px; margin:10px 0;}
+.footer { position:fixed; bottom:0; left:0; right:0; background:#fff; padding:10px; display:flex; justify-content:space-between;}
+button { background:#ff8fab; color:#fff; border:none; padding:6px; border-radius:6px;}
+.modal { position:fixed; top:0; left:0; width:100%; height:100%; background:white; display:none; padding:20px;}
 </style>
 </head>
 
@@ -17,25 +21,38 @@ button { background:#ff8fab; color:#fff; border:none; padding:8px; border-radius
 
 <h2>💕 下單平台</h2>
 
+<div class="tab">
+<button onclick="showTab(0)">穿戴甲</button>
+<button onclick="showTab(1)">飾品</button>
+<button onclick="showTab(2)">美瞳</button>
+</div>
+
 <div id="products"></div>
 
-<h3>客戶資料</h3>
+<div class="footer">
+<div>總額: $<span id="total">0</span></div>
+<button onclick="openCheckout()">結帳</button>
+</div>
+
+<!-- 結帳 -->
+<div id="checkout" class="modal">
+<h3>填寫資料</h3>
 <input id="name" placeholder="姓名"><br><br>
 <input id="phone" placeholder="電話"><br><br>
 <input id="social" placeholder="IG/LINE"><br><br>
 
-<select id="payment">
+<select id="pay">
 <option>貨到付款</option>
 <option>轉帳</option>
 <option>LinePay</option>
-</select>
+</select><br><br>
 
-<div class="footer">
-<div>總額: $<span id="total">0</span></div>
-<button onclick="checkout()">結帳</button>
+<button onclick="submit()">送出訂單</button>
+<button onclick="closeModal()">返回</button>
 </div>
 
-<div id="success" style="display:none">
+<!-- 成功 -->
+<div id="success" class="modal">
 <h2>✅ 已提交訂單</h2>
 <textarea id="result"></textarea><br>
 <button onclick="copy()">複製</button>
@@ -44,36 +61,38 @@ button { background:#ff8fab; color:#fff; border:none; padding:8px; border-radius
 
 <script>
 let cart=[];
+let tab=0;
 
-const data = [
-{cat:"穿戴甲", items:[
-{name:"簡約款", price:200, size:true},
-{name:"鑽款", price:300, size:true}
-]},
-{cat:"飾品", items:[
-{name:"項鍊", price:150},
-{name:"耳環", price:100}
-]},
-{cat:"美瞳", items:[
-{name:"日拋", price:200},
-{name:"月拋", price:350}
-]}
+const data=[
+[
+{name:"簡約款",price:200,size:true},
+{name:"鑽款",price:300,size:true}
+],
+[
+{name:"耳環",price:100},
+{name:"項鍊",price:150}
+],
+[
+{name:"日拋",price:200},
+{name:"月拋",price:200}
+]
 ];
+
+function showTab(t){
+tab=t;
+render();
+}
 
 function render(){
 let html="";
-data.forEach(c=>{
-html+=`<h3>${c.cat}</h3>`;
-c.items.forEach((p,i)=>{
+data[tab].forEach((p,i)=>{
 html+=`
 <div class="card">
 ${p.name} $${p.price}<br>
-${p.size?`尺寸:<select id="size-${p.name}">
-<option>S</option><option>M</option><option>L</option>
-</select><br>`:""}
+${p.size?`<select id="s${i}"><option>S</option><option>M</option><option>L</option></select>`:""}
+<br>
 <button onclick="add('${p.name}',${p.price})">加入</button>
 </div>`;
-});
 });
 document.getElementById("products").innerHTML=html;
 }
@@ -87,37 +106,41 @@ function calc(){
 let total=0;
 
 //穿戴甲4件800
-let nails = cart.filter(i=>i.p>=200);
-let others = cart.filter(i=>i.p<200);
-
+let nails=cart.filter(i=>i.p>=200);
 for(let i=0;i<nails.length;i+=4){
-let group=nails.slice(i,i+4);
-let sum=group.reduce((a,b)=>a+b.p,0);
+let g=nails.slice(i,i+4);
+let sum=g.reduce((a,b)=>a+b.p,0);
 total+= sum>800?800:sum;
 }
 
 //美瞳買3送1
-let lens = cart.filter(i=>i.n.includes("拋"));
-let lensCount=lens.length;
-let free=Math.floor(lensCount/4);
-total+= (lensCount-free)*200;
+let lens=cart.filter(i=>i.n.includes("拋"));
+let free=Math.floor(lens.length/4);
+total+= (lens.length-free)*200;
 
 //其他
-others.forEach(i=>total+=i.p);
+cart.filter(i=>i.p<200).forEach(i=>total+=i.p);
 
 document.getElementById("total").innerText=total;
 }
 
-function checkout(){
+function openCheckout(){
 if(!cart.length) return alert("沒商品");
+document.getElementById("checkout").style.display="block";
+}
 
+function closeModal(){
+document.getElementById("checkout").style.display="none";
+}
+
+function submit(){
 let name=document.getElementById("name").value;
 if(!name) return alert("填姓名");
 
 let total=document.getElementById("total").innerText;
 
 let deposit="";
-if(total>500) deposit="⚠️ 請先支付訂金\n";
+if(total>500) deposit="⚠️ 請先付訂金\n";
 
 let text=`訂單
 姓名:${name}
@@ -128,6 +151,7 @@ ${cart.map(i=>"- "+i.n).join("\n")}
 
 Line:@227agbpg`;
 
+document.getElementById("checkout").style.display="none";
 document.getElementById("success").style.display="block";
 document.getElementById("result").value=text;
 }
